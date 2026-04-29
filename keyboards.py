@@ -22,8 +22,17 @@ video_note_keyboard = ReplyKeyboardMarkup(
 comment_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="✍️ Оставить комментарий")],
-        [KeyboardButton(text="⏩ Пропустить")]
+        [KeyboardButton(text="⏩ Пропустить")],
+        [KeyboardButton(text="❌ Отмена")]
     ],
     resize_keyboard=True,
     input_field_placeholder="Оставьте комментарий или пропустите"
+)
+
+comment_keyboard_notext = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="⏩ Пропустить комментарий")]
+    ],
+    resize_keyboard=True,
+    input_field_placeholder="Пропустить комментарий"
 )

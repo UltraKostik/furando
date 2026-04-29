@@ -59,7 +59,7 @@ async def handle_save_video_note(message: Message, state: FSMContext):
         await message.answer(
             "✍️ Не хотите ли вы оставить комментарий под видеокружком?\n\n"
             "Расскажите про себя или как снимался видеокружок\n\n"
-            "<b>⚠️ Комментарий не должен нарушать политику конфиденциальности, "
+            "<b>⚠️ Комментарий не должен быть больше 500 символов и не должен нарушать политику конфиденциальности, "
             "законодательство РФ или содержать рекламный материал!</b>",
             reply_markup=kb.comment_keyboard,
             parse_mode="HTML"
@@ -69,14 +69,34 @@ async def handle_save_video_note(message: Message, state: FSMContext):
         await message.answer("❌ Ошибка при получении кружка.")
         logger.exception(f"[{ctime()}]. Ошибка в handle_save_video_note: {type(e).__name__}: {e}")
         
-#Хендлеры, отвечающие за комментарии
+#Хендлеры для комментариев
+        
+@router.message(CommentState.waiting_for_comment, F.text == "❌ Отмена")
+async def not_send_video_note(message: Message, state: FSMContext):
+    await message.answer("Отправление видеокружка отменено", reply_markup=kb.main_keyboard)
+    await state.clear()
+    await db.get_stats_video_note()
+    
+        
+@router.message(CommentState.waiting_for_comment, F.text == "✍️ Оставить комментарий")
+async def ask_for_comment(message: Message, state: FSMContext):
+    await message.answer("✍️ Напишите ваш комментарий:", reply_markup=kb.comment_keyboard_notext)
+    
+@router.message(CommentState.waiting_for_comment, F.text == "⏩ Пропустить")
+async def skip_comment(message: Message, state: FSMContext):
+    data = await state.get_data()
+    file_id = data.get("file_id")
+    user_id = data.get("user_id")
+    await db.save_video_note(user_id=user_id, file_id=file_id)
+    await message.answer("✅ Кружок сохранён без комментария!", reply_markup=kb.main_keyboard)
+    await state.clear()
 
 @router.message(CommentState.waiting_for_comment)
 async def save_with_comment(message: Message, state: FSMContext):
     data = await state.get_data()
     file_id = data.get("file_id")
     user_id = data.get("user_id")
-    comment = message.text
+    comment = message.text.strip()[:500]
     await db.save_video_note(user_id=user_id, file_id=file_id, comment=comment)
-    await message.answer("Кружок сохранён с комментарием ✅")
+    await message.answer(f"✅ Кружок сохранён с комментарием!\n💬 \"{comment}\"", reply_markup=kb.main_keyboard)
     await state.clear()
