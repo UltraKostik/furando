@@ -2,7 +2,7 @@
 
 import logging
 from time import ctime
-from sqlalchemy import Integer, String, Column
+from sqlalchemy import Integer, String, Column, update
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import select, func
@@ -20,6 +20,8 @@ class VideoNote(Base):
     user_id = Column(Integer, nullable=False)
     file_id = Column(String, unique=True, nullable=False)
     views = Column(Integer, default=0)
+    likes = Column(Integer, default=0)
+    username = Column(String, nullable=True)
     comment = Column(String, nullable=True)
 
 async def init_db():
@@ -29,11 +31,12 @@ async def init_db():
     except Exception as e:
         logger.exception(f"[{ctime()}]. Ошибка в init_db: {type(e).__name__}: {e}")
         
-async def save_video_note(user_id: int, file_id: str, comment: str = None):
+async def save_video_note(user_id: int, username: str = None, file_id: str = None, comment: str = None):
     try:
         async with async_session_maker() as session:
             video = VideoNote(
                 user_id = user_id,
+                username = username,
                 file_id = file_id,
                 comment = comment
             )
@@ -42,13 +45,13 @@ async def save_video_note(user_id: int, file_id: str, comment: str = None):
     except Exception as e:
         logger.exception(f"[{ctime()}]. Ошибка в save_video_note: {type(e).__name__}: {e}")
 
-async def get_random_video_note() -> tuple[str, str | None] | None:
+async def get_random_video_with_stats() -> tuple[str, str | None, str | None, int, int] | None:
     try:
         async with async_session_maker() as session:
-            result = await session.execute(select(VideoNote.file_id, VideoNote.comment).order_by(func.random()).limit(1))
+            result = await session.execute(select(VideoNote.file_id, VideoNote.comment, VideoNote.username, VideoNote.likes, VideoNote.views).order_by(func.random()).limit(1))
             return result.first()
     except Exception as e:
-        logger.exception(f"[{ctime()}]. Ошибка в get_random_video_note: {type(e).__name__}: {e}")
+        logger.exception(f"[{ctime()}]. Ошибка в get_random_video_with_stats: {type(e).__name__}: {e}")
 
 async def get_stats_video_note() -> int:
     try:
@@ -57,3 +60,27 @@ async def get_stats_video_note() -> int:
             return result.scalar() or 0
     except Exception as e:
         logger.exception(f"[{ctime()}]. Ошибка в get_stats_video_note: {type(e).__name__}: {e}")
+
+async def increment_views(file_id: str):
+    try:
+        async with async_session_maker() as session:
+            await session.execute(
+                update(VideoNote)
+                .where(VideoNote.file_id == file_id)
+                .values(views=VideoNote.views + 1)
+            )
+            await session.commit()
+    except Exception as e:
+        logger.exception(f"[{ctime()}]. Ошибка в increment_views: {type(e).__name__}: {e}")
+
+async def increment_likes(file_id:str):
+    try:
+        async with async_session_maker() as session:
+            await session.execute(
+                update(VideoNote)
+                .where(VideoNote.file_id == file_id)
+                .values(likes=VideoNote.likes + 1)
+            )
+            await session.commit()
+    except Exception as e:
+        logger.exception(f"[{ctime()}]. Ошибка в increment_likes: {type(e).__name__}: {e}")

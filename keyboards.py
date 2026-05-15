@@ -12,8 +12,7 @@ main_keyboard = ReplyKeyboardMarkup(
 
 video_note_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="❤️ Лайк"), KeyboardButton(text="⚠️ Пожаловаться"), KeyboardButton(text="👎 Дизлайк")],
-        [KeyboardButton(text="⏩ Дальше")]
+        [KeyboardButton(text="❤️"), KeyboardButton(text="⚠️"), KeyboardButton(text="👎"), KeyboardButton(text="😴")]
     ],
     resize_keyboard=True,
     input_field_placeholder="Оцените кружок"
