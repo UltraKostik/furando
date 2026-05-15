@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 from aiogram.types import ErrorEvent
 import handlers as hd
+import payment as pm
 from database import init_db
 
 def setup_logger(name: str) -> logging.Logger:
@@ -53,6 +54,7 @@ async def main():
         bot = Bot(token=token)
         dp = Dispatcher()
         dp.include_router(hd.router)
+        dp.include_router(pm.router)
         @dp.errors()
         async def handle_errors(event: ErrorEvent):
             logger.exception("Глобальная ошибка")

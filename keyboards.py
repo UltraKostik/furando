@@ -4,7 +4,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 main_keyboard = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="🎲 Погнали")]
+        [KeyboardButton(text="🎲 Погнали")],
+        [KeyboardButton(text="💸 Premium")],
     ],
     resize_keyboard=True,
     input_field_placeholder="Нажмите кнопку"
@@ -16,6 +17,17 @@ video_note_keyboard = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True,
     input_field_placeholder="Оцените кружок"
+)
+
+money_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="1 день • 39 ⭐"), KeyboardButton(text="7 дней • 89 ⭐")],
+        [KeyboardButton(text="30 дней • 169 ⭐"), KeyboardButton(text="90 дней • 349 ⭐🔥")],
+        [KeyboardButton(text="180 дней • 499 ⭐🔥"), KeyboardButton(text="365 дней • 899 ⭐🔥")],
+        [KeyboardButton(text="🤗 Патроны проекта")]
+    ],
+    resize_keyboard=True,
+    input_field_placeholder="Выберите тариф"
 )
 
 comment_keyboard = ReplyKeyboardMarkup(
