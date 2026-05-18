@@ -53,6 +53,14 @@ async def get_random_video_with_stats() -> tuple[str, str | None, str | None, in
     except Exception as e:
         logger.exception(f"[{ctime()}]. Ошибка в get_random_video_with_stats: {type(e).__name__}: {e}")
 
+async def get_video_stats(file_id: str) -> tuple[int, int, str | None, str | None] | None:
+    try:
+        async with async_session_maker() as session:
+            result = await session.execute(select(VideoNote.file_id, VideoNote.comment, VideoNote.username, VideoNote.likes, VideoNote.views).where(VideoNote.file_id == file_id))
+            return result.first()
+    except Exception as e:
+        logger.exception(f"[{ctime()}]. Ошибка в get_video_stats: {type(e).__name__}: {e}")
+
 async def get_stats_video_note() -> int:
     try:
         async with async_session_maker() as session:

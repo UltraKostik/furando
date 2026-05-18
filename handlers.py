@@ -1,11 +1,12 @@
 #Telegram бот Фурандо, Furando. Разработчик @UltraKostik
 
-from aiogram import F, Router
+from aiogram import F, Bot, Router
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, FSInputFile
+from aiogram.types import Message
 from aiogram.enums import ContentType
 from time import ctime
+from payment import PremiumPaymentState
 import keyboards as kb
 import logging
 import database as db
@@ -14,6 +15,7 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 class CommentState(StatesGroup):
+    warning_for_video = State()
     waiting_for_comment = State()
     waiting_for_activity = State()
 
@@ -32,10 +34,11 @@ async def handle_start(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer("⚠️ Произошла ошибка. Пожалуйста, попробуйте позже.")
         logger.exception(f"[{ctime()}]. Ошибка в handle_start: {type(e).__name__}: {e}")
-        
+    
 @router.message(F.text.in_(["/get", "🎲 Погнали", "⏩ Дальше"]))
 async def handle_get_random_video_note(message: Message, state: FSMContext):
     try:
+        await state.get_state()
         result = await db.get_random_video_with_stats()
         if result:
             file_id, comment, username, likes, views = result
@@ -78,7 +81,16 @@ async def handle_save_video_note(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer("❌ Ошибка при получении кружка.")
         logger.exception(f"[{ctime()}]. Ошибка в handle_save_video_note: {type(e).__name__}: {e}")
-        
+
+#Хендлер для обработки назад
+
+@router.message(CommentState.waiting_for_activity, F.text == "😴")
+@router.message(PremiumPaymentState.choosing_tariff, F.text == "⬅️ Назад")
+@router.message(PremiumPaymentState.waiting_for_payment, F.text == "⬅️ Назад")
+async def handle_back_to_main(message: Message, state: FSMContext):
+    await message.answer("🔙 Возврат в главное меню", reply_markup=kb.main_keyboard)
+    await handle_start(message, state)
+    
 #Хендлеры для комментариев
         
 @router.message(CommentState.waiting_for_comment, F.text == "❌ Отмена")
@@ -123,15 +135,66 @@ async def send_like(message: Message, state: FSMContext):
         await message.answer("❤️ Лайк отправлен!")
         await handle_get_random_video_note(message, state)
 
-@router.message(CommentState.waiting_for_activity, F.text == "⚠️")
-async def send_warning(message: Message, state: FSMContext):
-    pass
-
-@router.message(CommentState.waiting_for_activity, F.text == "😴")
-async def send_sleep(message: Message, state: FSMContext):
-    await message.answer("🔙 Возврат в главное меню")
-    await handle_start(message, state)
-
 @router.message(CommentState.waiting_for_activity, F.text == "👎")
 async def send_dislike(message: Message, state: FSMContext):
     pass
+
+#Хендлеры для жалоб на видеокружки
+
+@router.message(CommentState.waiting_for_activity, F.text == "⚠️")
+async def send_warning(message: Message, state: FSMContext):
+    try:
+        await message.answer("⚠️ Почему вам не понравился видеокружок?\n\nПожалуйста, выберите причину или напишите свою:", reply_markup=kb.warning_keyboard)
+        await state.set_state(CommentState.warning_for_video)
+    except Exception as e:
+        await message.answer("⚠️ Произошла ошибка. Пожалуйста, попробуйте позже.")
+        logger.exception(f"[{ctime()}]. Ошибка в send_warning: {type(e).__name__}: {e}")
+    
+@router.message(CommentState.warning_for_video, F.text)
+async def save_warning(message: Message, state: FSMContext, bot: Bot):
+    try:
+        data = await state.get_data()
+        current_file_id = data.get("current_file_id")
+        reason = message.text.strip()[:500]
+        if reason.startswith("⚠️ "): 
+            reason = reason[2:].strip()
+        video_data = await db.get_video_stats(current_file_id)
+        if video_data:
+            file_id, comment, username, likes, views = video_data
+            author_name = f"@{username}" if username else "Безымянный автор"
+            comment_text = f"\"{comment}\"" if comment else "<i>Нет комментария</i>"
+            await bot.send_video_note(chat_id=1649812640, video_note=file_id)
+            await bot.send_message(
+                chat_id=1649812640,
+                text=f"<b>⚠️ НОВАЯ ЖАЛОБА!</b>\n\n"
+                     f"<b>👤 Пользователь:</b> @{message.from_user.username or message.from_user.id}\n"
+                     f"<b>🆔 ID:</b> <code>{message.from_user.id}</code>\n"
+                     f"<b>🎬 ID видео:</b> <code>{current_file_id}</code>\n"
+                     f"<b>📝 Причина:</b> {reason}\n\n"
+                     f"<b>📊 СТАТИСТИКА ВИДЕО:</b>\n"
+                     f"❤️ <b>Лайки:</b> {likes}\n"
+                     f"👁️ <b>Просмотры:</b> {views}\n"
+                     f"👤 <b>Автор:</b> {author_name}\n"
+                     f"💬 <b>Комментарий автора:</b> {comment_text}",
+                parse_mode="HTML"
+            )
+        else:
+            await bot.send_message(
+                chat_id=1649812640,
+                text=f"<b>⚠️ ЖАЛОБА на НЕИЗВЕСТНОЕ ВИДЕО!</b>\n\n"
+                     f"<b>👤 Пользователь:</b> @{message.from_user.username or message.from_user.id}\n"
+                     f"<b>🆔 ID:</b> <code>{message.from_user.id}</code>\n"
+                     f"<b>🎬 ID видео:</b> <code>{current_file_id}</code>\n"
+                     f"<b>📝 Причина:</b> {reason}",
+                parse_mode="HTML"
+            )
+        await message.answer("✅ Спасибо за бдительность! Мы рассмотрим этот видеокружок.", reply_markup=kb.main_keyboard)
+        await handle_get_random_video_note(message, state)
+    except Exception as e:
+        await message.answer("⚠️ Произошла ошибка. Пожалуйста, попробуйте позже.")
+        logger.exception(f"[{ctime()}]. Ошибка в save_warning: {type(e).__name__}: {e}")
+        
+@router.message(CommentState.warning_for_video, F.text == "❌ Отмена")
+async def cancel_warning(message: Message, state: FSMContext):
+    await message.answer("❌ Жалоба отменена.", reply_markup=kb.main_keyboard)
+    await handle_get_random_video_note(message, state)
