@@ -1,7 +1,7 @@
 #Telegram бот Фурандо, Furando. Разработчик @UltraKostik#
 
 import logging
-from time import ctime
+from time import ctime, time
 from sqlalchemy import Integer, String, Column, update
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
@@ -23,6 +23,13 @@ class VideoNote(Base):
     likes = Column(Integer, default=0)
     username = Column(String, nullable=True)
     comment = Column(String, nullable=True)
+
+class PremiumSubscription(Base):
+    __tablename__ = 'premium_subscriptions'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False)
+    username = Column(String, nullable=True)
+    end_date = Column(Integer, nullable=False)
 
 async def init_db():
     try:
@@ -92,3 +99,40 @@ async def increment_likes(file_id:str):
             await session.commit()
     except Exception as e:
         logger.exception(f"[{ctime()}]. Ошибка в increment_likes: {type(e).__name__}: {e}")
+        
+#Хендлеры для работы с premium-подпиской 
+
+async def save_premium_subscription(user_id: int, username: str | None, end_date: int):
+    try:
+        async with async_session_maker() as session:
+            existing = await session.execute(select(PremiumSubscription).where(PremiumSubscription.user_id == user_id))
+            existing_sub = existing.scalar_one_or_none()
+            
+            if existing_sub:
+                existing_sub.end_date = end_date
+                existing_sub.username = username
+            else:
+                subscription = PremiumSubscription(
+                    user_id=user_id,
+                    username=username,
+                    end_date=end_date
+                )
+                session.add(subscription)
+            
+            await session.commit()
+    except Exception as e:
+        logger.exception(f"[{ctime()}]. Ошибка в save_premium_subscription: {type(e).__name__}: {e}")
+
+async def is_premium(user_id: int) -> bool:
+    try:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(PremiumSubscription).where(
+                    PremiumSubscription.user_id == user_id,
+                    PremiumSubscription.end_date > int(time.time())
+                )
+            )
+            return result.scalar_one_or_none() is not None
+    except Exception as e:
+        logger.exception(f"[{ctime()}]. Ошибка в is_premium: {type(e).__name__}: {e}")
+        return False

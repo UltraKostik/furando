@@ -149,6 +149,12 @@ async def send_warning(message: Message, state: FSMContext):
     except Exception as e:
         await message.answer("⚠️ Произошла ошибка. Пожалуйста, попробуйте позже.")
         logger.exception(f"[{ctime()}]. Ошибка в send_warning: {type(e).__name__}: {e}")
+
+@router.message(CommentState.warning_for_video, F.text == "❌ Отмена")
+async def cancel_warning(message: Message, state: FSMContext):
+    await message.answer("❌ Жалоба отменена.", reply_markup=kb.main_keyboard)
+    await handle_get_random_video_note(message, state)
+    return
     
 @router.message(CommentState.warning_for_video, F.text)
 async def save_warning(message: Message, state: FSMContext, bot: Bot):
@@ -193,8 +199,3 @@ async def save_warning(message: Message, state: FSMContext, bot: Bot):
     except Exception as e:
         await message.answer("⚠️ Произошла ошибка. Пожалуйста, попробуйте позже.")
         logger.exception(f"[{ctime()}]. Ошибка в save_warning: {type(e).__name__}: {e}")
-        
-@router.message(CommentState.warning_for_video, F.text == "❌ Отмена")
-async def cancel_warning(message: Message, state: FSMContext):
-    await message.answer("❌ Жалоба отменена.", reply_markup=kb.main_keyboard)
-    await handle_get_random_video_note(message, state)
